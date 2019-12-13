@@ -1,16 +1,10 @@
-//locals {
-//  cluster_id_tag = {
-//    "kubernetes.io/cluster/${rancher2_cluster.cluster.id}" = "owned"
-//  }
-//}
-
 provider "null" {}
 
 resource "null_resource" "delay" {
   depends_on = [aws_instance.rancherserver]
 
   provisioner "local-exec" {
-    command = "sleep 100"
+    command = "sleep 200"
   }
 }
 
@@ -45,9 +39,18 @@ resource "rancher2_cluster" "cluster" {
 
   name = "rancher-${formatdate("YYYY-MM-DD-hh-mm-ss",timestamp())}"
   description = "Just a Rancher test cluster created at ${timestamp()}"
+
+  enable_cluster_istio = true
+  enable_cluster_monitoring = true
+
   rke_config {
+    kubernetes_version    = var.kubernetes_version
+
     cloud_provider {
       name = "aws"
+      aws_cloud_provider {
+
+      }
     }
 
     authentication {
@@ -68,7 +71,6 @@ resource "rancher2_cluster" "cluster" {
   }
 }
 
-
 # Create a new rancher2 Node Template
 resource "rancher2_node_template" "node_template" {
   provider = rancher2.admin
@@ -83,11 +85,12 @@ resource "rancher2_node_template" "node_template" {
     security_group = [aws_security_group.allow-all.name]
     subnet_id = aws_default_subnet.default.id
     vpc_id = aws_default_subnet.default.vpc_id
-    zone = "a"
+    zone = var.availability_zone
     instance_type = var.instance_type
     iam_instance_profile = aws_iam_instance_profile.rke-aws.name
   }
 }
+
 # Create a new rancher2 Node Pool
 resource "rancher2_node_pool" "controlplane_node_pool" {
   provider = rancher2.admin
@@ -109,7 +112,7 @@ resource "rancher2_node_pool" "worker_node_pool" {
   name = "rancher-worker-node-pool"
   hostname_prefix =  "rancher-worker"
   node_template_id = rancher2_node_template.node_template.id
-  quantity = 2
+  quantity = 3
   control_plane = false
   etcd = false
   worker = true

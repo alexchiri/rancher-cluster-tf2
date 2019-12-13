@@ -59,6 +59,8 @@ output "private_key" {
   value = tls_private_key.node-key.private_key_pem
 }
 
+data "aws_caller_identity" "current" {}
+
 # Step 1: Create an IAM role
 resource "aws_iam_role" "rke-role" {
   name = "rke-role"
@@ -109,7 +111,21 @@ resource "aws_iam_role_policy" "rke-access-policy" {
       "Effect": "Allow",
       "Action": ["elasticloadbalancing:*"],
       "Resource": ["*"]
-    }
+    },
+    {
+      "Effect": "Allow",
+      "Action": "iam:CreateServiceLinkedRole",
+      "Resource": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/aws-service-role/elasticloadbalancing.amazonaws.com/AWSServiceRoleForElasticLoadBalancing*",
+      "Condition": {"StringLike": {"iam:AWSServiceName": "elasticloadbalancing.amazonaws.com"}}
+     },
+     {
+       "Effect": "Allow",
+       "Action": [
+           "iam:AttachRolePolicy",
+           "iam:PutRolePolicy"
+       ],
+       "Resource": "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/aws-service-role/elasticloadbalancing.amazonaws.com/AWSServiceRoleForElasticLoadBalancing*"
+     }
   ]
 }
 EOF
@@ -136,7 +152,7 @@ data "template_cloudinit_config" "rancherserver-cloudinit" {
 }
 
 data "template_file" "userdata_server" {
-  template = file("install-docker.sh")
+  template = file("init-rancher-server.sh")
 
   vars = {
     rancher_version       = var.rancher_version
@@ -150,6 +166,7 @@ resource "aws_instance" "rancherserver" {
   iam_instance_profile   = aws_iam_instance_profile.rke-aws.name
   vpc_security_group_ids = [aws_security_group.allow-all.id]
   user_data       = data.template_cloudinit_config.rancherserver-cloudinit.rendered
+  availability_zone = aws_default_subnet.default.availability_zone
 
   tags = {
     Name = "rancherserver"
