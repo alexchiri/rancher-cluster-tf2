@@ -123,6 +123,6 @@ resource "local_file" "kube_cluster_yaml" {
   content  = rancher2_cluster.cluster.kube_config
 
   provisioner "local-exec" {
-    command = "cp -f ./kube_config_cluster.yml ~/.kube/kubeconfig"
+    command = "cp -f ./kube_config_cluster.yml ~/.kube/config"
   }
 }
